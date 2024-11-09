@@ -1,12 +1,19 @@
-﻿using System;
-
-class Program
+﻿class Program
 {
-    static char dog = '@', symbol;
     static Random random = new Random();
-    static bool Reached_finish = false;
-    static int dogX, dogY, FinishX, FinishY, dX, dY, newX, newY, Width = 10, Height = 10;
+
+    static char dog = '@', symbol;
+    static bool ReachedFinish = false;
+    static int dogX, dogY;
+    static int FinishX, FinishY, JetPackX, JetPackY;
+    static int dX, dY, newX, newY;
+    static int Width = 10, Height = 10;
+    static int RemainingTime = 300;
+    static bool JetPackUsed;
+    static bool JetPackIsAvaliable = false;
+
     static char[,] Field = new char[Height, Width];
+    static Thread timerThread;
 
     static char[,] GenerateField()
     {
@@ -14,22 +21,31 @@ class Program
         {
             for (int j = 0; j < Width; j++)
             {
-                symbol = random.Next(0, 100) < 40 ? '#' : '.';
-                Field[i, j] = symbol;
+                var symbol = random.Next(0, 100);
+                if (symbol < 40)
+                    symbol = '#';
+                else
+                    symbol = '.';
+                Field[i, j] = (char)symbol;
             }
         }
 
-        FinishX = random.Next(0, Width);
-        FinishY = random.Next(0, Height);
         Field[FinishY, FinishX] = 'F';
+        Field[JetPackY, JetPackX] = 'J';
 
         return Field;
     }
 
-    static void PlaceDog()
+    static void GenerationOfCoordinatesForElements()
     {
         dogX = random.Next(0, Width);
         dogY = random.Next(0, Height);
+
+        JetPackX = random.Next(0, Width);
+        JetPackY = random.Next(0, Height);
+
+        FinishX = random.Next(0, Width);
+        FinishY = random.Next(0, Height);
     }
 
     static void Draw()
@@ -50,26 +66,20 @@ class Program
 
     static void GetInput()
     {
-        dX = 0;
-        dY = 0;
 
-        string input = Console.ReadLine();
+        char input = Console.ReadKey(true).KeyChar;
 
-        if (input == "W" || input == "w") 
+        if (input == 'W' || input == 'w')
             dY = -1;
-        else if (input == "A" || input == "a") 
+        else if (input == 'A' || input == 'a')
             dX = -1;
-        else if (input == "S" || input == "s") 
+        else if (input == 'S' || input == 's')
             dY = 1;
-        else if (input == "D" || input == "d") 
+        else if (input == 'D' || input == 'd')
             dX = 1;
     }
 
-    static bool IsEndGame()
-    {
-        return Reached_finish;
-    }
-
+    #region Move logic
     static bool IsWalkable(int X, int Y)
     {
         return Field[Y, X] != '#';
@@ -95,18 +105,52 @@ class Program
         if (CanGoTo(newX, newY))
             GoTo(newX, newY);
     }
+    #endregion
+
+    static bool IsEndGame()
+    {
+        return ReachedFinish || RemainingTime <= 0;
+    }
+
+    static void Timer()
+    {
+        while (RemainingTime > 0 && !ReachedFinish)
+        {
+            Thread.Sleep(1000);
+            RemainingTime--;
+        }
+    }
 
     static bool CheckFinish()
     {
         if (dogX == FinishX && dogY == FinishY)
-            return Reached_finish = true;
+            return ReachedFinish = true;
         return false;
     }
 
+    static void JetPackLogic()
+    {
+        if (dogX == JetPackX && dogY == JetPackY && !JetPackIsAvaliable)
+        {
+            JetPackIsAvaliable = true;
+            Field[JetPackY, JetPackX] = '.';
+        }
+
+        if (JetPackIsAvaliable && !JetPackUsed)
+        {
+            if (Field[dogY + dY, dogX + dX] == '#')
+            {
+                JetPackUsed = true;
+                dogX += dX;
+                dogY += dY;
+            }
+        }
+    }
     static void Logic()
     {
         newX = dogX + dX;
         newY = dogY + dY;
+        JetPackLogic();
         TryGoTo(newX, newY);
         dX = 0;
         dY = 0;
@@ -115,16 +159,23 @@ class Program
 
     static void Main(string[] args)
     {
+        GenerationOfCoordinatesForElements();
         GenerateField();
-        PlaceDog();
+
+        timerThread = new Thread(Timer);
+        timerThread.Start();
 
         while (!IsEndGame())
         {
             Draw();
-            //Console.WriteLine($"cords: ({FinishX}, {FinishY})");
+            //Console.WriteLine($"Finish coordinates:{FinishX}, {FinishY}");
+            Console.WriteLine($"Remaining time:{RemainingTime} seconds");
+            //Console.WriteLine($"JetPack:{JetPackIsAvaliable}\nJetPack used:{JetPackUsed}\nCoordinates JetPack:{JetPackX} {JetPackY}\nCoordinates Dog:{dogX}, {dogY}");
+
             GetInput();
             Logic();
         }
-        Console.WriteLine("Finish!");
+        Console.WriteLine("Game end!");
+
     }
 }
